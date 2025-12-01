@@ -1,0 +1,8 @@
+scikit-learn
+sklearn-genetic-opt
+deap
+pandas
+numpy
+matplotlib
+seaborn
+scipy
