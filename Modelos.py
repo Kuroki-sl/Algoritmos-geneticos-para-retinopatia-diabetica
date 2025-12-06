@@ -1,6 +1,7 @@
-# =============================================================================
-# 1. IMPORTACIONES
-# =============================================================================
+#==============================================================================
+#1.IMPORTACIONES
+#==============================================================================
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,18 +14,18 @@ from sklearn.model_selection import train_test_split, StratifiedKFold, ShuffleSp
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score, recall_score
 
-# Algoritmos de Machine Learning
+#Algoritmos de Machine Learning
 from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 
-# Algoritmos Geneticos
+#Algoritmos Geneticos
 from sklearn_genetic import GASearchCV
 from sklearn_genetic.space import Continuous, Categorical, Integer
 
-# =============================================================================
-# 2. FUNCIONES AUXILIARES
-# =============================================================================
+#==============================================================================
+#2.DECLARACION DE FUNCIONES
+#==============================================================================
 
 def calcular_especificidad(y_real, y_predicha):
     tn, fp, fn, tp = confusion_matrix(y_real, y_predicha).ravel()
@@ -36,7 +37,7 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
     #Y_test seran los datos que guardaremos para la posterior evaluacion
     mejores_params = "N/A (Por defecto)"
 
-    # Clonamos el modelo base para no sobrescribir configuraciones previas
+    #clonamos el modelo base para no sobrescribir configuraciones previas
     from sklearn.base import clone
     clasificador = clone(modelo_base)
 
@@ -44,7 +45,7 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
         clasificador.fit(X_train, y_train)
 
     elif escenario == 'AG sin VC':
-        # Split simple interno para el AG (del 80%, saca un trozo para validar)
+        #split simple interno para el AG (del 80%, saca un trozo para validar)
         cv_interna = ShuffleSplit(n_splits=1, test_size=0.20, random_state=42)
 
         gas = GASearchCV(
@@ -59,7 +60,7 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
         clasificador = gas.best_estimator_
 
     elif escenario == 'AG con VC':
-        #Validacion cruzada de 5 pliegues sobre el 80%
+        #validacion cruzada de 5 pliegues sobre el 80%
         cv_interna = 5
 
         gas = GASearchCV(
@@ -73,10 +74,10 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
         mejores_params = gas.best_params_
         clasificador = gas.best_estimator_
 
-    #Uso del 20% guardado para calcular metricas
+    #uso del 20% guardado para calcular metricas
     y_predicha = clasificador.predict(X_test)
 
-    # Calculo de metricas
+    #calculo de metricas
     try:
         if hasattr(clasificador, "predict_proba"):
             y_prob = clasificador.predict_proba(X_test)[:, 1]
@@ -98,24 +99,22 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
         'Mejores_Parametros': mejores_params
     }
 
+#==============================================================================
+#3.CARGA, LIMPIEZA, DIVISION Y NORMALIZACION DEL DATA SET
+#==============================================================================
 
-# =============================================================================
-# 3. CARGA, LIMPIEZA, DIVISION Y NORMALIZACION
-# =============================================================================
-
-# Carga de datos
+#carga del data set
 try:
     data, meta = arff.loadarff('messidor_features.arff')
     df = pd.DataFrame(data)
 except:
     print("¡Error! Asegúrate de tener el archivo 'messidor_features.arff'.")
-    # Generamos datos dummy para que el codigo no rompa si falta el archivo
     from sklearn.datasets import make_classification
     X_dum, y_dum = make_classification(n_samples=1151, n_features=19, random_state=42)
     df = pd.DataFrame(X_dum)
     df['clase'] = y_dum
 
-# Limpieza basica de nombres de columnas
+#limpieza basica de nombres de columnas
 nombres_columnas = [
     'calidad', 'pre_screening', 'ma_0.5', 'ma_0.6', 'ma_0.7', 'ma_0.8', 'ma_0.9', 'ma_1.0',
     'exudados_0.5', 'exudados_0.6', 'exudados_0.7', 'exudados_0.8', 'exudados_0.9', 'exudados_1.0',
@@ -123,39 +122,40 @@ nombres_columnas = [
 ]
 if df.shape[1] == 20: df.columns = nombres_columnas
 
-# Correccion de tipo de dato en la clase (de bytes a enteros si es necesario)
+#correccion de tipo de dato en la clase
 if df['clase'].dtype == object:
     df['clase'] = df['clase'].astype(str).str.replace("b'", "").str.replace("'", "").astype(int)
 
-# -------------------------------------------------------------------------
-# LIMPIEZA DE DUPLICADOS
-# -------------------------------------------------------------------------
+#==============================================================================
+#4.LIMPIEZA DE DUPLICADOS
+#==============================================================================
+
 print(f"1. Dimensiones originales: {df.shape}")
 duplicados = df.duplicated().sum()
 if duplicados > 0:
-    print(f"   ¡Atención! Se encontraron {duplicados} filas duplicadas.")
+    print(f">> Se encontraron {duplicados} filas duplicadas.")
     df = df.drop_duplicates()
-    print(f"   -> Duplicados eliminados. Nuevas dimensiones: {df.shape}")
+    print(f">> Duplicados eliminados. Nuevas dimensiones: {df.shape}")
 else:
     print("   -> No se encontraron duplicados.")
 
-# Separacion de variables
+#separacion de variables
 X = df.drop('clase', axis=1)
 y = df['clase']
 
-# B. DIVISION 80/20
+#division 20/80
 X_entr_crudo, X_prueba_crudo, y_entrenamiento, y_prueba = train_test_split(
     X, y, test_size=0.20, stratify=y, random_state=42
 )
 
-# C. NORMALIZACION
+#normalizacion
 scaler = MinMaxScaler()
-scaler.fit(X_entr_crudo) # Aprende solo del train
+scaler.fit(X_entr_crudo) #en base al train
 
 X_entr_norm = pd.DataFrame(scaler.transform(X_entr_crudo), columns=X.columns)
 X_prueba_norm = pd.DataFrame(scaler.transform(X_prueba_crudo), columns=X.columns)
 
-# Guardar escalador para normalizar el 20% guardado
+#guardar escalador para normalizar el 20% guardado de test
 joblib.dump(scaler, 'escalador_entrenado.pkl')
 
 print("-" * 40)
@@ -165,9 +165,10 @@ print(">> Normalización completada.")
 print("-" * 40)
 
 
-# =============================================================================
-# 4. DEFINICION DE MODELOS Y PARAMETROS
-# =============================================================================
+#==============================================================================
+#5.DEFINICION DE PARAMETROS PARA LOS MODELOS
+#==============================================================================
+
 modelo_svm = SVC(probability=True, random_state=42)
 params_svm = {
     'C': Continuous(0.1, 150),
@@ -195,9 +196,10 @@ Lista_Modelos = [
 ]
 
 
-# =============================================================================
-# 5. EJECUCION DE LOS ENTRENAMIENTOS
-# =============================================================================
+#==============================================================================
+#6.EJECUCION DE LOS ENTRENAMIENTOS
+#==============================================================================
+
 Resultados_Totales = []
 
 variantes = [
@@ -229,12 +231,13 @@ for nombre, modelo, params in Lista_Modelos:
             print(f"Error en {nombre} - {escenario}: {e}")
 
 
-# =============================================================================
-# 6. TABLAS Y GRAFICOS
-# =============================================================================
+#==============================================================================
+#7.GENERAR TABLAS DE LOS RESULTADOS
+#==============================================================================
+
 df_res = pd.DataFrame(Resultados_Totales)
 
-# Limpieza de nombres
+#limpieza de nombres
 mapa_nombres = {
     "No optimizado": "Sin optimización",
     "Optimizado": "Optimizado",
@@ -243,7 +246,7 @@ mapa_nombres = {
 df_res['Configuracion'] = df_res['Configuracion'].replace(mapa_nombres)
 df_final = df_res.copy()
 
-# Orden logico
+#orden logico
 orden_config = ["Sin optimización", "Optimizado", "Optimizado + VC"]
 df_final['Configuracion'] = pd.Categorical(df_final['Configuracion'], categories=orden_config, ordered=True)
 
@@ -258,20 +261,21 @@ df_exportar = df_final[cols_exportar].sort_values(by=['Algoritmo', 'Configuracio
 print(f"\n{'='*80}")
 print("TABLA RESUMEN DE RESULTADOS")
 print(f"{'='*80}")
-# Mostramos en consola sin la columna de parametros para que se lea bien
+#mostrar en consola sin la columna de parametros para que se lea bien
 cols_vista = [c for c in cols_exportar if c != 'Mejores_Parametros']
 print(df_exportar[cols_vista].round(4).to_string(index=False))
 
-# Guardamos el archivo
+#guardar el archivo en formato .csv
 df_exportar.to_csv("Metricas.csv", index=False)
 print(f"\n>> Archivo guardado exitosamente: 'Metricas.csv'")
 
-# -----------------------------------------------------------------------------
-# 2. GENERAR GRAFICOS
-# -----------------------------------------------------------------------------
+#==============================================================================
+# 2.GENERAR GRAFICOS DE LAS METRICAS
+#==============================================================================
+
 metricas_a_graficar = ['Accuracy', 'Sensibilidad', 'Especificidad', 'AUC', 'VPP', 'VPN']
 
-# Creaacion de carpeta de graficos
+#crear la carpeta "graficos"
 carpeta_graficos = "graficos"
 if not os.path.exists(carpeta_graficos):
     os.makedirs(carpeta_graficos)
@@ -283,7 +287,7 @@ print(f"\n{'='*80}")
 print(f"GENERANDO GRÁFICOS EN: {carpeta_graficos}/")
 print(f"{'='*80}")
 
-sns.set_style("whitegrid") # Estilo de fondo
+sns.set_style("whitegrid")
 
 for metrica in metricas_a_graficar:
     plt.figure(figsize=(10, 6))
@@ -296,7 +300,6 @@ for metrica in metricas_a_graficar:
         palette='viridis'
     )
     
-    # Título dinámico (Aclaración para VPP = Precisión)
     titulo = f'Comparativa de {metrica} por Modelo'
     if metrica == 'VPP': titulo += " (Precisión)"
     
@@ -312,6 +315,6 @@ for metrica in metricas_a_graficar:
     ruta_completa = os.path.join(carpeta_graficos, nombre_archivo)
     
     plt.savefig(ruta_completa, dpi=300, bbox_inches='tight')
-    plt.close() # Cerrar para liberar memoria
+    plt.close() #cerrar para liberar memoria
     
     print(f">> Grafico generado: {ruta_completa}")
