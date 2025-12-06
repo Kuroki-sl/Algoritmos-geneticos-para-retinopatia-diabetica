@@ -5,7 +5,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import joblib  # Para guardar el escalador
+import joblib
+import os  # <--- NUEVO IMPORT AGREGADO
 
 from scipy.io import arff
 from sklearn.model_selection import train_test_split, StratifiedKFold, ShuffleSplit
@@ -17,7 +18,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 
-# Algoritmos Genéticos
+# Algoritmos Geneticos
 from sklearn_genetic import GASearchCV
 from sklearn_genetic.space import Continuous, Categorical, Integer
 
@@ -31,9 +32,8 @@ def calcular_especificidad(y_real, y_predicha):
     return tn / (tn + fp)
 
 def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train, y_train, X_test, y_test, escenario):
-    """
-    Función central que entrena y evalúa los modelos según el escenario.
-    """
+    #X_train seran los datos con los que entrenaremos a los modelos
+    #Y_test seran los datos que guardaremos para la posterior evaluacion
     mejores_params = "N/A (Por defecto)"
 
     # Clonamos el modelo base para no sobrescribir configuraciones previas
@@ -41,7 +41,6 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
     clasificador = clone(modelo_base)
 
     if escenario == 'Sin Optimizar':
-        # Entrenamos con el 80% directo
         clasificador.fit(X_train, y_train)
 
     elif escenario == 'AG sin VC':
@@ -52,7 +51,7 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
             estimator=modelo_base,
             cv=cv_interna,
             scoring='accuracy',
-            population_size=10, generations=5,  # Ajusta esto si quieres más potencia
+            population_size=5, generations=2, 
             param_grid=grilla_parametros, n_jobs=-1, verbose=False
         )
         gas.fit(X_train, y_train)
@@ -60,24 +59,24 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
         clasificador = gas.best_estimator_
 
     elif escenario == 'AG con VC':
-        # Validación cruzada de 5 pliegues sobre el 80%
+        #Validacion cruzada de 5 pliegues sobre el 80%
         cv_interna = 5
 
         gas = GASearchCV(
             estimator=modelo_base,
             cv=cv_interna,
             scoring='accuracy',
-            population_size=10, generations=5,
+            population_size=5, generations=2,
             param_grid=grilla_parametros, n_jobs=-1, verbose=False
         )
         gas.fit(X_train, y_train)
         mejores_params = gas.best_params_
         clasificador = gas.best_estimator_
 
-    # --- EVALUACIÓN FINAL CON EL 20% RESERVADO ---
+    #Uso del 20% guardado para calcular metricas
     y_predicha = clasificador.predict(X_test)
 
-    # Cálculo de métricas
+    # Calculo de metricas
     try:
         if hasattr(clasificador, "predict_proba"):
             y_prob = clasificador.predict_proba(X_test)[:, 1]
@@ -94,29 +93,29 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
         'Sensibilidad': recall_score(y_test, y_predicha),
         'Especificidad': calcular_especificidad(y_test, y_predicha),
         'AUC': roc,
-        'VPP': tp / (tp + fp) if (tp + fp) > 0 else 0, # Precisión
+        'VPP': tp / (tp + fp) if (tp + fp) > 0 else 0,
         'VPN': tn / (tn + fn) if (tn + fn) > 0 else 0,
         'Mejores_Parametros': mejores_params
     }
 
 
 # =============================================================================
-# 3. CARGA, LIMPIEZA, DIVISIÓN Y NORMALIZACIÓN
+# 3. CARGA, LIMPIEZA, DIVISION Y NORMALIZACION
 # =============================================================================
 
-# A. Carga de datos
+# Carga de datos
 try:
     data, meta = arff.loadarff('messidor_features.arff')
     df = pd.DataFrame(data)
 except:
     print("¡Error! Asegúrate de tener el archivo 'messidor_features.arff'.")
-    # Generamos datos dummy para que el código no rompa si falta el archivo
+    # Generamos datos dummy para que el codigo no rompa si falta el archivo
     from sklearn.datasets import make_classification
     X_dum, y_dum = make_classification(n_samples=1151, n_features=19, random_state=42)
     df = pd.DataFrame(X_dum)
     df['clase'] = y_dum
 
-# Limpieza básica de nombres de columnas
+# Limpieza basica de nombres de columnas
 nombres_columnas = [
     'calidad', 'pre_screening', 'ma_0.5', 'ma_0.6', 'ma_0.7', 'ma_0.8', 'ma_0.9', 'ma_1.0',
     'exudados_0.5', 'exudados_0.6', 'exudados_0.7', 'exudados_0.8', 'exudados_0.9', 'exudados_1.0',
@@ -124,7 +123,7 @@ nombres_columnas = [
 ]
 if df.shape[1] == 20: df.columns = nombres_columnas
 
-# Corrección de tipo de dato en la clase (de bytes a enteros si es necesario)
+# Correccion de tipo de dato en la clase (de bytes a enteros si es necesario)
 if df['clase'].dtype == object:
     df['clase'] = df['clase'].astype(str).str.replace("b'", "").str.replace("'", "").astype(int)
 
@@ -140,23 +139,23 @@ if duplicados > 0:
 else:
     print("   -> No se encontraron duplicados.")
 
-# Separación de variables
+# Separacion de variables
 X = df.drop('clase', axis=1)
 y = df['clase']
 
-# B. DIVISIÓN 80/20 (DATOS CRUDOS)
+# B. DIVISION 80/20
 X_entr_crudo, X_prueba_crudo, y_entrenamiento, y_prueba = train_test_split(
     X, y, test_size=0.20, stratify=y, random_state=42
 )
 
-# C. NORMALIZACIÓN CORRECTA
+# C. NORMALIZACION
 scaler = MinMaxScaler()
 scaler.fit(X_entr_crudo) # Aprende solo del train
 
 X_entr_norm = pd.DataFrame(scaler.transform(X_entr_crudo), columns=X.columns)
 X_prueba_norm = pd.DataFrame(scaler.transform(X_prueba_crudo), columns=X.columns)
 
-# Guardar escalador
+# Guardar escalador para normalizar el 20% guardado
 joblib.dump(scaler, 'escalador_entrenado.pkl')
 
 print("-" * 40)
@@ -167,7 +166,7 @@ print("-" * 40)
 
 
 # =============================================================================
-# 4. DEFINICIÓN DE MODELOS Y PARÁMETROS
+# 4. DEFINICION DE MODELOS Y PARAMETROS
 # =============================================================================
 modelo_svm = SVC(probability=True, random_state=42)
 params_svm = {
@@ -197,7 +196,7 @@ Lista_Modelos = [
 
 
 # =============================================================================
-# 5. EJECUCIÓN DE EXPERIMENTOS
+# 5. EJECUCION DE LOS ENTRENAMIENTOS
 # =============================================================================
 Resultados_Totales = []
 
@@ -231,7 +230,7 @@ for nombre, modelo, params in Lista_Modelos:
 
 
 # =============================================================================
-# 6. TABLAS Y GRÁFICOS FINALES (ACTUALIZADO: TODO AUTOMATIZADO)
+# 6. TABLAS Y GRAFICOS
 # =============================================================================
 df_res = pd.DataFrame(Resultados_Totales)
 
@@ -244,13 +243,10 @@ mapa_nombres = {
 df_res['Configuracion'] = df_res['Configuracion'].replace(mapa_nombres)
 df_final = df_res.copy()
 
-# Orden lógico
+# Orden logico
 orden_config = ["Sin optimización", "Optimizado", "Optimizado + VC"]
 df_final['Configuracion'] = pd.Categorical(df_final['Configuracion'], categories=orden_config, ordered=True)
 
-# -----------------------------------------------------------------------------
-# 1. GUARDAR CSV UNIFICADO (Métricas + Hiperparámetros)
-# -----------------------------------------------------------------------------
 cols_exportar = [
     'Algoritmo', 'Configuracion', 
     'Accuracy', 'Sensibilidad', 'Especificidad', 'AUC', 'VPP', 'VPN', 
@@ -262,21 +258,29 @@ df_exportar = df_final[cols_exportar].sort_values(by=['Algoritmo', 'Configuracio
 print(f"\n{'='*80}")
 print("TABLA RESUMEN DE RESULTADOS")
 print(f"{'='*80}")
-# Mostramos en consola sin la columna de parámetros para que se lea bien
+# Mostramos en consola sin la columna de parametros para que se lea bien
 cols_vista = [c for c in cols_exportar if c != 'Mejores_Parametros']
 print(df_exportar[cols_vista].round(4).to_string(index=False))
 
 # Guardamos el archivo
-df_exportar.to_csv("reporte_completo_modelos.csv", index=False)
-print(f"\n>> Archivo guardado exitosamente: 'reporte_completo_modelos.csv'")
+df_exportar.to_csv("Metricas.csv", index=False)
+print(f"\n>> Archivo guardado exitosamente: 'Metricas.csv'")
 
 # -----------------------------------------------------------------------------
-# 2. GENERAR GRÁFICOS PARA TODAS LAS MÉTRICAS
+# 2. GENERAR GRAFICOS
 # -----------------------------------------------------------------------------
 metricas_a_graficar = ['Accuracy', 'Sensibilidad', 'Especificidad', 'AUC', 'VPP', 'VPN']
 
+# Creaacion de carpeta de graficos
+carpeta_graficos = "graficos"
+if not os.path.exists(carpeta_graficos):
+    os.makedirs(carpeta_graficos)
+    print(f"\n>> Carpeta creada: '{carpeta_graficos}'")
+else:
+    print(f"\n>> Usando carpeta existente: '{carpeta_graficos}'")
+
 print(f"\n{'='*80}")
-print("GENERANDO GRÁFICOS...")
+print(f"GENERANDO GRÁFICOS EN: {carpeta_graficos}/")
 print(f"{'='*80}")
 
 sns.set_style("whitegrid") # Estilo de fondo
@@ -303,11 +307,11 @@ for metrica in metricas_a_graficar:
     plt.legend(title='Estrategia', bbox_to_anchor=(1.02, 1), loc='upper left')
     plt.tight_layout()
     
-    # Guardar imagen
+    #guardado de graficos en su carpeta
     nombre_archivo = f"grafico_{metrica.lower()}.png"
-    plt.savefig(nombre_archivo, dpi=300, bbox_inches='tight')
+    ruta_completa = os.path.join(carpeta_graficos, nombre_archivo)
+    
+    plt.savefig(ruta_completa, dpi=300, bbox_inches='tight')
     plt.close() # Cerrar para liberar memoria
     
-    print(f">> Gráfico generado: {nombre_archivo}")
-
-print("\n¡Ejecución completada! Revisa tu carpeta para ver los resultados.")
+    print(f">> Grafico generado: {ruta_completa}")
