@@ -19,7 +19,13 @@ Estructura del Repositorio:
 
 "Modelos.py": Codigo principal para el entrenamiento, optimización y visualización.
 "messidor_features.arff": Dataset utilizado (debe estar en la raíz para ejecutar el código).
-"Dependencias.txt": Lista de dependencias necesarias.
+"requirements.txt": Lista de dependencias necesarias.
+
+El ejecutar el codigo generará los siguientes elementos:
+
+"graficos": una carpeta que contendra todos las imagenes de los graficos de las metricas calculadas.
+"escalador_entrenado.pkl": archivo que guardara los parametros de normalizacion que uso para el 80% que se uso para el entrenamiento y los usara para normalizar el 20% que el modelo no "conoce"
+"Metricas.cvx": archivo que contendra las metricas e hiperparámetros que obtuvo el codigo al ejecutarse.
 
 Requisitos e Instalación:
 
