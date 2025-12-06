@@ -51,7 +51,7 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
             estimator=modelo_base,
             cv=cv_interna,
             scoring='accuracy',
-            population_size=5, generations=2, 
+            population_size=30, generations=15, 
             param_grid=grilla_parametros, n_jobs=-1, verbose=False
         )
         gas.fit(X_train, y_train)
@@ -66,7 +66,7 @@ def ejecutar_experimento(nombre_modelo, modelo_base, grilla_parametros, X_train,
             estimator=modelo_base,
             cv=cv_interna,
             scoring='accuracy',
-            population_size=5, generations=2,
+            population_size=30, generations=15,
             param_grid=grilla_parametros, n_jobs=-1, verbose=False
         )
         gas.fit(X_train, y_train)
@@ -170,12 +170,12 @@ print("-" * 40)
 # =============================================================================
 modelo_svm = SVC(probability=True, random_state=42)
 params_svm = {
-    'C': Continuous(0.1, 100),
+    'C': Continuous(0.1, 150),
     'gamma': Categorical(['scale', 'auto']),
-    'kernel': Categorical(['rbf', 'linear'])
+    'kernel': Categorical(['rbf', 'linear', 'poly'])
 }
 
-modelo_mlp = MLPClassifier(max_iter=1000, random_state=42)
+modelo_mlp = MLPClassifier(max_iter=3000, random_state=42)
 params_mlp = {
     'hidden_layer_sizes': Categorical([(50,), (100,), (50, 50)]),
     'activation': Categorical(['tanh', 'relu']),
@@ -184,8 +184,8 @@ params_mlp = {
 
 modelo_rf = RandomForestClassifier(random_state=42)
 params_rf = {
-    'n_estimators': Integer(50, 200),
-    'max_depth': Integer(5, 30)
+    'n_estimators': Integer(50, 250),
+    'max_depth': Integer(2, 30)
 }
 
 Lista_Modelos = [
