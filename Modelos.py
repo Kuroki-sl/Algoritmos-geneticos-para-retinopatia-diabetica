@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
-import os  # <--- NUEVO IMPORT AGREGADO
+import os 
 
 from scipy.io import arff
 from sklearn.model_selection import train_test_split, StratifiedKFold, ShuffleSplit
