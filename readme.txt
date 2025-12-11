@@ -31,4 +31,9 @@ Requisitos e Instalación:
 
 Este proyecto utiliza Python 3. Para instalar las librerías necesarias, ejecuta:
 
-bash: pip install -r requirements.txt
+pip install -r requirements.txt
+
+En caso de no tener python en la path:
+
+python -m pip install -r requirements.txt
+
